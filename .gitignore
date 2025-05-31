@@ -1,0 +1,11 @@
+eval_results*
+
+linear_results/
+
+logs/
+
+.venv/
+
+pretrained_weights/
+
+btbench/btbench_subject_metadata/

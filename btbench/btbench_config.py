@@ -1,6 +1,9 @@
 # Feel free to change this setting to your own directory.
 ROOT_DIR = "/om2/user/zaho/braintreebank_laplacian_rereferenced_line_noise_removed" # Root directory for the braintreebank data
 
+# uncomment for NOT LAPLACIAN REREFERENCED
+ROOT_DIR = "/om2/user/zaho/braintreebank/braintreebank" # Root directory for the braintreebank data
+
 
 # NOTE: Settings in this file below this line have global effect on the code. All parts of the pipeline have to run with the same settings.
 # If you want to change a setting, you have to rerun all parts of the pipeline with the new setting. Otherwise, things will break.

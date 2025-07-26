@@ -1,0 +1,11 @@
+.venv/
+
+eval_results*
+logs/
+remove_successful_logs.py
+
+pretrained_weights/
+
+**/__pycache__/
+
+.env

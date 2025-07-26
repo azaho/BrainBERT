@@ -1,65 +1,36 @@
-# BrainBERT
+# BrainBERT Neuroprobe Evaluation
 
 BrainBERT is an modeling approach for learning self-supervised representations of intracranial electrode data. See [paper](https://arxiv.org/abs/2302.14367) for details.
 
-We provide the training pipeline below.
+[Neuroprobe](https://neuroprobe.dev) is a benchmark for understanding how the brain processes information across multiple tasks. Visit the [Neuroprobe GitHub page](https://github.com/azaho/neuroprobe/)
 
-The trained weights have been released (see below) and pre-training data can be found at [braintreebank.dev](https://braintreebank.dev)
+This branch on the repository describes steps required to evaluate BrainBERT on Neuroprobe.
 
-## Installation
-Requirements:
-- pytorch >= 1.12.1
-- [pytorch gradual warmup scheduler](https://github.com/ildoonet/pytorch-gradual-warmup-lr)
-
+## Reproducing the evaluation
+1. Create a virtual environment (optional):
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
 ```
+
+2. Install the requirements (both for BrainBERT and Neuroprobe):
+```bash
 pip install -r requirements.txt
 ```
 
-### Input
-It is expected that the input is intracranial electrode data that has been Laplacian re-referenced.
-
-## Using BrainBERT embeddings
-- pretrained weights are available [here](https://drive.google.com/file/d/14ZBOafR7RJ4A6TsurOXjFVMXiVH6Kd_Q/view?usp=sharing)
-- see `notebooks/demo.ipynb` for an example input and example embedding
-
-## Upstream
-### BrainBERT pre-training data
-The data directory should be structured as:
-```
-/pretrain_data
-  |_manifests
-    |_manifests.tsv  <-- each line contains the path to the example and the length
-  |_<subject>
-    |_<trial>
-      |_<example>.npy
-```
-If using the data from the Brain Treebank, the data can be written using this command:
-```
-python3 -m data.write_pretrain_data_wavs +data=pretraining_template.yaml \
-+data_prep=write_pretrain_split ++data.duration=5 \
-++data_prep.pretrain_split=/storage/czw/BrainBERT/data/pretrain_split_trials.json 
-++data_prep.out_dir=pretrain_data \
-++data.raw_brain_data_dir=/path/to/braintreebank_data/
-```
-This command expects the Brain Treebank data to have the following structure:
-```
-/braintreebank_data
-  |_electrode_labels
-  |_subject_metadata
-  |_localization
-  |_all_subject_data
-    |_sub_*_trial*.h5
+3. Configure BrainTreebank dataset path in `neuroprobe/config.py`. NOTE: This dataset copy must already have line noise removed and electrodes Laplacian re-referenced, according to the methods and code of the original [BrainBERT paper](https://arxiv.org/abs/2302.14367).
+```python
+# In neuroprobe/config.py
+ROOT_DIR = "braintreebank"  # Root directory for the extracted braintreebank data
 ```
 
-### BrainBERT pre-training
+4. Download the pretrained BrainBERT weights from [here](https://drive.google.com/file/d/14ZBOafR7RJ4A6TsurOXjFVMXiVH6Kd_Q/view?usp=sharing) and make sure to put them in the `pretrained_weights/` directory.
+
+5. Run the file `run_neuroprobe_eval_frozen_population.py` to get regression results for any given subject/trial pair using:
+```bash
+python run_neuroprobe_eval_frozen_population.py --only_1second --subject_id SUBJECT_ID --trial_id TRIAL_ID --eval_name TASK_NAME --split_type SPLIT_TYPE
 ```
-python3 run_train.py +exp=spec2vec ++exp.runner.device=cuda ++exp.runner.multi_gpu=True \
-  ++exp.runner.num_workers=64 +data=masked_spec +model=masked_tf_model_large \
-  +data.data=/path/to/data ++data.val_split=0.01 +task=fixed_mask_pretrain.yaml \
-  +criterion=pretrain_masked_criterion +preprocessor=stft ++data.test_split=0.01 \
-  ++task.freq_mask_p=0.05 ++task.time_mask_p=0.05 ++exp.runner.total_steps=500000
-```
-Example parameters:
-```
-/path/to/data = /storage/user123/self_supervised_seeg/pretrain_data/manifests
-```
+Optionally, include a tag `--randomly_initialized_model`, to run regressins on an untrained BrainBERT model. To learn more, visit the original [Neuroprobe GitHub page](https://github.com/azaho/neuroprobe/). Alternatively, run the bash script `run_neuroprobe_eval_frozen_population.sh` to run all combinations of tasks in parallel (the script is set up to run using SLURM. Make sure to edit the parameters according to your compute cluster.)
+
+6. The results will now be saved in the `eval_results_SPLIT_TYPE` diretory!

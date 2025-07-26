@@ -13,3 +13,12 @@ scikit-learn
 tensorboard
 torch_optimizer
 tables
+beautifulsoup4
+requests
+torch
+torchvision
+numpy
+matplotlib
+seaborn
+wandb
+librosa

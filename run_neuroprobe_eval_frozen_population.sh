@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=10GB
 #SBATCH --exclude=dgx001,dgx002
-#SBATCH --mem=128G
+#SBATCH --mem=256G
 #SBATCH -t 1:00:00         # total run time limit (HH:MM:SS) (increased to 24 hours)
 #SBATCH --array=1-1368 #1-456 # 267-302
 #SBATCH --output logs/%A_%a.out # STDOUT
@@ -71,6 +71,14 @@ TRIAL=${trials[$PAIR_IDX]}
 SPLITS_TYPE=${splits_type[$SPLITS_TYPE_IDX]}
 FEATURE_TYPE=${feature_type[$FEATURE_TYPE_IDX]}
 RANDOM_INIT=${random_init[$RANDOM_INIT_IDX]}
+
+
+# Check if we're trying to evaluate subject 2 with DS_DM split (which is invalid)
+if [[ "$SPLITS_TYPE" == "DS_DM" && "$SUBJECT" == "2" ]]; then
+    echo "Cannot evaluate the cross subject split on subject 2; exiting"
+    exit 0
+fi
+
 
 SAVE_DIR="eval_results_${SPLITS_TYPE}"
 

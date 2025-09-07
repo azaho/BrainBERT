@@ -5,17 +5,17 @@
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=10GB
 #SBATCH --exclude=dgx001,dgx002
-#SBATCH --mem=256G
+#SBATCH --mem=128G
 #SBATCH -t 1:00:00         # total run time limit (HH:MM:SS) (increased to 24 hours)
-#SBATCH --array=1-456 #1-456 # 267-302
+#SBATCH --array=1-1368 #1-456 # 267-302
 #SBATCH --output logs/%A_%a.out # STDOUT
 #SBATCH --error logs/%A_%a.err # STDERR
-#SBATCH -p normal
+#SBATCH -p use-everything
 
 export PYTHONUNBUFFERED=1
 source .venv/bin/activate
 
-export BRAIN_TREEBANK_ROOT_DIR=/om2/user/zaho/braintreebank/braintreebank
+export ROOT_DIR_BRAINTREEBANK=/om2/user/zaho/braintreebank_laplacian_rereferenced_line_noise_removed/
 echo "Running on $(hostname)"
 
 
@@ -45,9 +45,9 @@ declare -a eval_names=(
     "speaker"
 )
 declare -a splits_type=(
-    #"SS_SM"
+    "SS_SM"
     "SS_DM"
-    # "DS_DM"
+    "DS_DM"
 )
 declare -a feature_type=(
     "keepall"

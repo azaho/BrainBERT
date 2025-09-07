@@ -15,6 +15,7 @@
 export PYTHONUNBUFFERED=1
 source .venv/bin/activate
 
+export BRAIN_TREEBANK_ROOT_DIR=/om2/user/zaho/braintreebank/braintreebank
 echo "Running on $(hostname)"
 
 

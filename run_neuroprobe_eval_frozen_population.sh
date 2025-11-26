@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mem=256G
 #SBATCH -t 1:00:00         # total run time limit (HH:MM:SS) (increased to 24 hours)
-#SBATCH --array=1-1368 #1-456 # 267-302
+#SBATCH --array=1-72
 #SBATCH --output logs/%A_%a.out # STDOUT
 #SBATCH --error logs/%A_%a.err # STDERR
 #SBATCH --open-mode=append  # Append to output files instead of overwriting
@@ -26,13 +26,10 @@ declare -a eval_names=(
     "frame_brightness"
     "global_flow"
     "local_flow"
-    "global_flow_angle"
-    "local_flow_angle" 
     "face_num"
     "volume"
     "pitch"
     "delta_volume"
-    "delta_pitch"
     "speech"
     "onset"
     "gpt2_surprisal"
@@ -41,12 +38,13 @@ declare -a eval_names=(
     "word_index"
     "word_head_pos"
     "word_part_speech"
-    "speaker"
 )
+eval_names=$(IFS=,; echo "${eval_names[*]}") # Join the eval names with commas to run them in sequence
+
 declare -a splits_type=(
-    "SS_SM"
-    "SS_DM"
-    "DS_DM"
+    "WithinSession"
+    "CrossSession"
+    "CrossSubject"
 )
 declare -a feature_type=(
     "keepall"

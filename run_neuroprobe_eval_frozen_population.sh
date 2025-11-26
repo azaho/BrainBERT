@@ -3,21 +3,20 @@
 #SBATCH --ntasks=1             # 8 tasks total
 #SBATCH --cpus-per-task=2    # Request 8 CPU cores per GPU
 #SBATCH --gres=gpu:1
-#SBATCH --constraint=10GB
-#SBATCH --exclude=dgx001,dgx002
 #SBATCH --mem=256G
 #SBATCH -t 1:00:00         # total run time limit (HH:MM:SS) (increased to 24 hours)
 #SBATCH --array=1-1368 #1-456 # 267-302
 #SBATCH --output logs/%A_%a.out # STDOUT
 #SBATCH --error logs/%A_%a.err # STDERR
-#SBATCH -p use-everything
+#SBATCH --open-mode=append  # Append to output files instead of overwriting
+#SBATCH --requeue
+#SBATCH -p mit_preemptable
 
 export PYTHONUNBUFFERED=1
 source .venv/bin/activate
 
-export ROOT_DIR_BRAINTREEBANK=/om2/user/zaho/braintreebank_laplacian_rereferenced_line_noise_removed/
+export ROOT_DIR_BRAINTREEBANK=/orcd/data/fiete/001/zaho/braintreebank_laplacian_rereferenced_line_noise_removed/
 echo "Running on $(hostname)"
-
 
 # Use the BTBENCH_LITE_SUBJECT_TRIALS from btbench_config.py
 declare -a subjects=(1 1 2 2 3 3 4 4 7 7 10 10)

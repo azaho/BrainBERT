@@ -19,10 +19,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-3. Configure BrainTreebank dataset path in `neuroprobe/config.py`. NOTE: This dataset copy must already have line noise removed and electrodes Laplacian re-referenced, according to the methods and code of the original [BrainBERT paper](https://arxiv.org/abs/2302.14367).
-```python
-# In neuroprobe/config.py
-ROOT_DIR = "braintreebank"  # Root directory for the extracted braintreebank data
+3. Configure BrainTreebank dataset path in `run_neuroprobe_eval_frozen_population.sh`. NOTE: This dataset copy must already have line noise removed and electrodes Laplacian re-referenced, according to the methods and code of the original [BrainBERT paper](https://arxiv.org/abs/2302.14367).
+```sh
+# In run_neuroprobe_eval_frozen_population.sh and anywhere before running the evaluation in the shell
+export ROOT_DIR_BRAINTREEBANK=/orcd/data/fiete/001/zaho/braintreebank_laplacian_rereferenced_line_noise_removed/ # Root directory for the extracted braintreebank data
 ```
 
 4. Download the pretrained BrainBERT weights from [here](https://drive.google.com/file/d/14ZBOafR7RJ4A6TsurOXjFVMXiVH6Kd_Q/view?usp=sharing) and make sure to put them in the `pretrained_weights/` directory.
@@ -30,6 +30,10 @@ ROOT_DIR = "braintreebank"  # Root directory for the extracted braintreebank dat
 5. Run the file `run_neuroprobe_eval_frozen_population.py` to get regression results for any given subject/trial pair using:
 ```bash
 python run_neuroprobe_eval_frozen_population.py --only_1second --subject_id SUBJECT_ID --trial_id TRIAL_ID --eval_name TASK_NAME --split_type SPLIT_TYPE
+```
+For example:
+```bash
+python run_neuroprobe_eval_frozen_population.py --only_1second --subject_id 10 --trial_id 0 --eval_name onset --split_type WithinSession
 ```
 Optionally, include a tag `--randomly_initialized_model`, to run regressins on an untrained BrainBERT model. To learn more, visit the original [Neuroprobe GitHub page](https://github.com/azaho/neuroprobe/). Alternatively, run the bash script `run_neuroprobe_eval_frozen_population.sh` to run all combinations of tasks in parallel (the script is set up to run using SLURM. Make sure to edit the parameters according to your compute cluster.)
 

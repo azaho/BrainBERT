@@ -23,14 +23,14 @@ def log(message, priority=0, indent=0):
 ### DEFINING PARAMETERS ###
 
 splits_options = [
-    'SS_SM', # same subject, same trial
-    'SS_DM', # same subject, different trial    
-    'DS_DM', # different subject, different trial
+    'WithinSession', # same subject, same trial
+    'CrossSession', # same subject, different trial    
+    'CrossSubject', # different subject, different trial
 ]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--eval_name', type=str, default='onset', help='Evaluation name(s) (e.g. onset, gpt2_surprisal). If multiple, separate with commas.')
-parser.add_argument('--split_type', type=str, choices=splits_options, default='SS_SM', help=f'Type of splits to use ({", ".join(splits_options)})')
+parser.add_argument('--split_type', type=str, choices=splits_options, default='WithinSession', help=f'Type of splits to use ({", ".join(splits_options)})')
 parser.add_argument('--subject_id', type=int, required=True, help='Subject ID')
 parser.add_argument('--trial_id', type=int, required=True, help='Trial ID')
 
@@ -62,17 +62,22 @@ seed = args.seed
 only_1second = bool(args.only_1second)
 lite = not bool(args.full)
 nano = bool(args.nano)
-assert (not nano) or (splits_type != "SS_DM"), "Nano only works with SS_SM or DS_DM splits; does not work with SS_DM."
+assert (not nano) or (splits_type != "CrossSession"), "Nano only works with WithinSession or CrossSubject splits; does not work with CrossSession."
 assert (not nano) or lite, "--nano and --full cannot be used together. Neuroprobe Full and Neuroprobe Nano are different evaluations."
 
 batch_size = args.batch_size
 random_init = bool(args.randomly_initialized_model)
 feature_type = args.feature_type
 
+# Load device
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+cuda_available = torch.cuda.is_available()
+print(f"Using device: {device}")
+
 # Set random seeds for reproducibility
 np.random.seed(seed)
 torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)
+if cuda_available: torch.cuda.manual_seed(seed)
 
 ### LOAD SUBJECT ###
 
@@ -95,7 +100,7 @@ import torch
 from omegaconf import OmegaConf
 def build_model(cfg):
     ckpt_path = cfg.upstream_ckpt
-    init_state = torch.load(ckpt_path, weights_only=False)
+    init_state = torch.load(ckpt_path, weights_only=False, map_location=device)
     upstream_cfg = init_state["model_cfg"]
     upstream = models.build_model(upstream_cfg)
     return upstream
@@ -108,12 +113,12 @@ log(f"Loading the model...", priority=0)
 ckpt_path = "pretrained_weights/stft_large_pretrained.pth"
 cfg = OmegaConf.create({"upstream_ckpt": ckpt_path})
 model = build_model(cfg)
-model.to('cuda')
-init_state = torch.load(ckpt_path, weights_only=False)
+model.to(device)
+init_state = torch.load(ckpt_path, weights_only=False, map_location=device)
 if not random_init:
     load_model_weights(model, init_state['model'], False)
 del init_state
-torch.cuda.empty_cache()     # optional: releases unused GPU cached blocks back to the OS
+if cuda_available: torch.cuda.empty_cache()     # optional: releases unused GPU cached blocks back to the OS
 
 ### SETUP FEATURE GENERATION FUNCTION ###
 
@@ -164,10 +169,10 @@ def get_brainbert_features(x, fs=2048):
         batch_i, n_channels, n_freqs, n_times = linear.shape
         
         # to tensor shape: (batch_i * n_channels, n_times, n_freqs)
-        batch_inputs = torch.FloatTensor(linear).transpose(-1, -2).to('cuda')
+        batch_inputs = torch.FloatTensor(linear).transpose(-1, -2).to(device)
         batch_inputs = batch_inputs.reshape(batch_i * n_channels, n_times, n_freqs)
 
-        batch_mask = torch.zeros(batch_inputs.shape[:2], dtype=torch.bool, device='cuda')
+        batch_mask = torch.zeros(batch_inputs.shape[:2], dtype=torch.bool, device=device)
 
         # model forward -> (batch_i*n_channels, n_times, d_model)
         batch_out = model.forward(batch_inputs, batch_mask, intermediate_rep=True)
@@ -181,7 +186,7 @@ def get_brainbert_features(x, fs=2048):
 
     # Clean up intermediate variables immediately
     del batch_inputs, batch_mask, linear, f, t, batch_out
-    torch.cuda.empty_cache()
+    if cuda_available: torch.cuda.empty_cache()
     gc.collect()
     
     return result
@@ -220,7 +225,7 @@ def load_dataset(dataset):
             features_np = features.detach().cpu().float().numpy().copy()
             # Clear the original tensor immediately
             del features
-            torch.cuda.empty_cache()
+            if cuda_available: torch.cuda.empty_cache()
 
         if X is None:
             X = np.zeros((len(dataset), *features_np.shape[1:]), dtype=features_np.dtype)
@@ -343,23 +348,23 @@ for eval_name in eval_names:
     }
 
     # train_datasets and test_datasets are arrays of length k_folds, each element is a BrainTreebankSubjectTrialBenchmarkDataset for the train/test split
-    if splits_type == "SS_SM":
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_SS_SM(subject, trial_id, eval_name, dtype=torch.float32, 
+    if splits_type == "WithinSession":
+        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_WithinSession(subject, trial_id, eval_name, dtype=torch.float32, 
                                                                                         output_indices=False, 
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
                                                                                         lite=lite, nano=nano)
-    elif splits_type == "SS_DM":
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_SS_DM(subject, trial_id, eval_name, dtype=torch.float32, 
+    elif splits_type == "CrossSession":
+        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_CrossSession(subject, trial_id, eval_name, dtype=torch.float32, 
                                                                                         output_indices=False, 
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
                                                                                         lite=lite)
         train_datasets = [train_datasets]
         test_datasets = [test_datasets]
-    elif splits_type == "DS_DM":
+    elif splits_type == "CrossSubject":
         if verbose: log("Loading the training subject...", priority=0)
-        train_subject_id = neuroprobe_config.DS_DM_TRAIN_SUBJECT_ID
+        train_subject_id = neuroprobe_config.CrossSubject_TRAIN_SUBJECT_ID
         train_subject = BrainTreebankSubject(train_subject_id, allow_corrupted=False, cache=True, dtype=torch.float32)
         train_subject_electrodes = neuroprobe_config.NEUROPROBE_LITE_ELECTRODES[train_subject.subject_identifier] if lite else train_subject.electrode_labels
         train_subject.set_electrode_subset(train_subject_electrodes)
@@ -368,7 +373,7 @@ for eval_name in eval_names:
             train_subject_id: train_subject,
         }
         if verbose: log("Subject loaded.", priority=0)
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_DS_DM(all_subjects, subject_id, trial_id, eval_name, dtype=torch.float32, 
+        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_CrossSubject(all_subjects, subject_id, trial_id, eval_name, dtype=torch.float32, 
                                                                                         output_indices=False, 
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
@@ -402,7 +407,7 @@ for eval_name in eval_names:
             X_test, y_test = load_dataset(test_dataset)
             gc.collect()  # Collect after creating large arrays
 
-            if splits_type == "DS_DM":
+            if splits_type == "CrossSubject":
                 if verbose: log("Combining regions...", priority=1, indent=1)
                 regions_train = get_region_labels(train_subject)
                 regions_test = get_region_labels(subject)
@@ -444,7 +449,7 @@ for eval_name in eval_names:
             clf = LogisticRegression(random_state=seed, max_iter=10000, tol=1e-3)
             clf.fit(X_train, y_train)
 
-            torch.cuda.empty_cache()
+            if cuda_available: torch.cuda.empty_cache()
             gc.collect()
 
             # Evaluate model
@@ -507,7 +512,7 @@ for eval_name in eval_names:
                 log(f"Population, Fold {fold_idx+1}, Bin {bin_start}-{bin_end}: Train accuracy: {train_accuracy:.3f}, Test accuracy: {test_accuracy:.3f}, Train ROC AUC: {train_roc:.3f}, Test ROC AUC: {test_roc:.3f}", priority=0, indent=0)
 
         # Clean up datasets after processing all folds for this time bin
-        torch.cuda.empty_cache()
+        if cuda_available: torch.cuda.empty_cache()
         gc.collect()
 
         if bin_start == -bins_start_before_word_onset_seconds and bin_end == bins_end_after_word_onset_seconds and not only_1second:
@@ -555,6 +560,6 @@ for eval_name in eval_names:
     # Clean up at end of each eval_name loop
     del train_datasets, test_datasets
     gc.collect()
-    torch.cuda.empty_cache()  # Ensure GPU memory is also cleaned up
+    if cuda_available: torch.cuda.empty_cache()  # Ensure GPU memory is also cleaned up
     if verbose:
         log(f"Completed evaluation {eval_name}, memory cleaned up", priority=0)

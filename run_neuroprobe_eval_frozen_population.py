@@ -47,6 +47,8 @@ parser.add_argument('--randomly_initialized_model', type=int, default=0, help='W
 parser.add_argument('--batch_size', type=int, default=50, help='Batch size for feature computation')
 
 parser.add_argument('--feature_type', type=str, default='keepall', help='How to extract features from the model. Options: \'meanE\' (mean across electrodes), \'meanT\' (mean across timebins), \'cls\' (only take the first token of the electrode dimension), any combinations of these (you can use _ to concatenate them) or \'keepall\' (keep all tokens)')
+
+parser.add_argument('--binary_tasks', type=lambda x: x.lower() == 'true', default=True, help='Whether to use binary classification for tasks that support it')
 args = parser.parse_args()
 
 eval_names = args.eval_name.split(',')
@@ -68,6 +70,8 @@ assert (not nano) or lite, "--nano and --full cannot be used together. Neuroprob
 batch_size = args.batch_size
 random_init = bool(args.randomly_initialized_model)
 feature_type = args.feature_type
+
+binary_tasks = bool(args.binary_tasks)
 
 # Load device
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -354,13 +358,13 @@ for eval_name in eval_names:
                                                                                         output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
-                                                                                        lite=lite, nano=nano)
+                                                                                        lite=lite, nano=nano, binary_tasks=binary_tasks)
     elif splits_type == "CrossSession":
         folds = neuroprobe_train_test_splits.generate_splits_CrossSession(subject, trial_id, eval_name, dtype=torch.float32, 
                                                                                         output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
-                                                                                        lite=lite)
+                                                                                        lite=lite, binary_tasks=binary_tasks)
     elif splits_type == "CrossSubject":
         if verbose: log("Loading the training subject...", priority=0)
         train_subject_id = neuroprobe_config.CrossSubject_TRAIN_SUBJECT_ID
@@ -376,7 +380,7 @@ for eval_name in eval_names:
                                                                                         output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
-                                                                                        lite=lite, nano=nano)
+                                                                                        lite=lite, nano=nano, binary_tasks=binary_tasks)
 
 
     for bin_start, bin_end in zip(bin_starts, bin_ends):

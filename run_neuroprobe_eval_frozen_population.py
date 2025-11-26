@@ -50,7 +50,7 @@ parser.add_argument('--feature_type', type=str, default='keepall', help='How to 
 args = parser.parse_args()
 
 eval_names = args.eval_name.split(',')
-splits_type = args.split_type.upper()
+splits_type = args.split_type
 subject_id = args.subject_id
 trial_id = args.trial_id
 
@@ -348,20 +348,19 @@ for eval_name in eval_names:
     }
 
     # train_datasets and test_datasets are arrays of length k_folds, each element is a BrainTreebankSubjectTrialBenchmarkDataset for the train/test split
+    print(f"Generating splits for {splits_type}...")
     if splits_type == "WithinSession":
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_WithinSession(subject, trial_id, eval_name, dtype=torch.float32, 
-                                                                                        output_indices=False, 
+        folds = neuroprobe_train_test_splits.generate_splits_WithinSession(subject, trial_id, eval_name, dtype=torch.float32, 
+                                                                                        output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
                                                                                         lite=lite, nano=nano)
     elif splits_type == "CrossSession":
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_CrossSession(subject, trial_id, eval_name, dtype=torch.float32, 
-                                                                                        output_indices=False, 
+        folds = neuroprobe_train_test_splits.generate_splits_CrossSession(subject, trial_id, eval_name, dtype=torch.float32, 
+                                                                                        output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
                                                                                         lite=lite)
-        train_datasets = [train_datasets]
-        test_datasets = [test_datasets]
     elif splits_type == "CrossSubject":
         if verbose: log("Loading the training subject...", priority=0)
         train_subject_id = neuroprobe_config.CrossSubject_TRAIN_SUBJECT_ID
@@ -373,13 +372,11 @@ for eval_name in eval_names:
             train_subject_id: train_subject,
         }
         if verbose: log("Subject loaded.", priority=0)
-        train_datasets, test_datasets = neuroprobe_train_test_splits.generate_splits_CrossSubject(all_subjects, subject_id, trial_id, eval_name, dtype=torch.float32, 
-                                                                                        output_indices=False, 
+        folds = neuroprobe_train_test_splits.generate_splits_CrossSubject(all_subjects, subject_id, trial_id, eval_name, dtype=torch.float32, 
+                                                                                        output_indices=False, output_dict=False,
                                                                                         start_neural_data_before_word_onset=int(bins_start_before_word_onset_seconds*neuroprobe_config.SAMPLING_RATE), 
                                                                                         end_neural_data_after_word_onset=int(bins_end_after_word_onset_seconds*neuroprobe_config.SAMPLING_RATE),
                                                                                         lite=lite, nano=nano)
-        train_datasets = [train_datasets]
-        test_datasets = [test_datasets]
 
 
     for bin_start, bin_end in zip(bin_starts, bin_ends):
@@ -393,9 +390,9 @@ for eval_name in eval_names:
         }
 
         # Loop over all folds
-        for fold_idx in range(len(train_datasets)):
-            train_dataset = train_datasets[fold_idx]
-            test_dataset = test_datasets[fold_idx]
+        for fold_idx, fold in enumerate(folds):
+            train_dataset = fold['train_dataset']
+            test_dataset = fold['test_dataset']
 
             if verbose:
                 log(f"Fold {fold_idx+1}, Bin {bin_start}-{bin_end}")
@@ -558,7 +555,7 @@ for eval_name in eval_names:
         log(f"Results saved to {file_save_path}", priority=0)
 
     # Clean up at end of each eval_name loop
-    del train_datasets, test_datasets
+    del folds
     gc.collect()
     if cuda_available: torch.cuda.empty_cache()  # Ensure GPU memory is also cleaned up
     if verbose:

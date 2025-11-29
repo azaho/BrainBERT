@@ -34,6 +34,7 @@ NEUROPROBE_GLOBAL_RANDOM_SEED = 42
 
 # Standardizing pretraining and evaluation subjects and trials
 DS_DM_TRAIN_SUBJECT_ID, DS_DM_TRAIN_TRIAL_ID = 2, 4
+CrossSubject_TRAIN_SUBJECT_ID, CrossSubject_TRAIN_TRIAL_ID = 2, 4 # alias
 # Define the maximum number of samples to use for the lite datasetq
 NEUROPROBE_LITE_MAX_SAMPLES = 3500
 NEUROPROBE_LITE_N_FOLDS = 2
